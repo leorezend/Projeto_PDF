@@ -3,3 +3,4 @@ gunicorn
 pdfplumber
 PyPDF2
 pandas
+flask-cors
