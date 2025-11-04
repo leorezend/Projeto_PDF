@@ -2,11 +2,13 @@
 from flask import Flask, request, jsonify
 import tempfile
 import os
+import traceback # Importa para capturar o erro
 from voetuor_processor import processar_voetuor
 from scdp_processor import processar_scdp
 
 app = Flask(__name__)
 from flask_cors import CORS
+# CORS habilitado para todas as origens
 CORS(app)
 
 @app.route('/')
@@ -21,21 +23,35 @@ def processar_pdfs():
     if not voetuor_file or not scdp_file:
         return jsonify({"error": "Envie os dois PDFs: voetuor e scdp"}), 400
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        voetuor_path = os.path.join(tmpdir, "voetuor.pdf")
-        scdp_path = os.path.join(tmpdir, "scdp.pdf")
-        voetuor_file.save(voetuor_path)
-        scdp_file.save(scdp_path)
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            voetuor_path = os.path.join(tmpdir, "voetuor.pdf")
+            scdp_path = os.path.join(tmpdir, "scdp.pdf")
+            voetuor_file.save(voetuor_path)
+            scdp_file.save(scdp_path)
 
-        # chama suas funções (retornam estruturas Python)
-        voetuor_data = processar_voetuor(voetuor_path)
-        scdp_data = processar_scdp(scdp_path)
+            # chama suas funções (retornam estruturas Python)
+            voetuor_data = processar_voetuor(voetuor_path)
+            scdp_data = processar_scdp(scdp_path)
 
-    return jsonify({
-        "voetuor": voetuor_data,
-        "scdp": scdp_data,
-        "status": "ok"
-    }), 200
+        return jsonify({
+            "voetuor": voetuor_data,
+            "scdp": scdp_data,
+            "status": "ok"
+        }), 200
+    
+    except Exception as e:
+        # Captura qualquer erro durante o processamento do PDF
+        # Imprime o traceback no log do Render para diagnóstico
+        print("--- ERRO DE PROCESSAMENTO DE PDF ---")
+        traceback.print_exc()
+        print("------------------------------------")
+        
+        # Retorna um 500 para o APEX com a mensagem de erro
+        return jsonify({
+            "error": "Erro interno ao processar PDFs. Verifique os logs do servidor.",
+            "details": str(e)
+        }), 500
 
 
 if __name__ == "__main__":
