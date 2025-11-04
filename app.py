@@ -10,8 +10,11 @@ from scdp_processor import processar_scdp
 
 app = Flask(__name__)
 
-# 🔧 Configuração CORS explícita
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+# ✅ Permite o acesso do APEX (ajuste se quiser limitar)
+CORS(app, resources={r"/*": {"origins": "*"}})
+
+# --- resto do código permanece igual ---
+
 
 def run_processor(processor_func, pdf_path, queue):
     try:
