@@ -1,4 +1,3 @@
-# app.py (Versão Síncrona e Simplificada)
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import tempfile
@@ -10,9 +9,10 @@ from voetuor_processor import processar_voetuor
 from scdp_processor import processar_scdp
 
 app = Flask(__name__)
-CORS(app)
 
-# Função auxiliar para rodar o processador em um processo separado
+# 🔧 Configuração CORS explícita
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+
 def run_processor(processor_func, pdf_path, queue):
     try:
         data = processor_func(pdf_path)
@@ -23,8 +23,6 @@ def run_processor(processor_func, pdf_path, queue):
 @app.route('/processar_pdfs', methods=['POST'])
 def processar_pdfs_endpoint():
     start_time = time.time()
-    
-    # 1. Verifica se os arquivos foram enviados
     voetuor_file = request.files.get('voetuor')
     scdp_file = request.files.get('scdp')
 
@@ -35,12 +33,9 @@ def processar_pdfs_endpoint():
         with tempfile.TemporaryDirectory() as tmpdir:
             voetuor_path = os.path.join(tmpdir, "voetuor.pdf")
             scdp_path = os.path.join(tmpdir, "scdp.pdf")
-            
-            # Salva os arquivos temporariamente
             voetuor_file.save(voetuor_path)
             scdp_file.save(scdp_path)
 
-            # 2. Execução Paralela (Multiprocessing)
             queue_voetuor = multiprocessing.Queue()
             queue_scdp = multiprocessing.Queue()
 
@@ -49,22 +44,19 @@ def processar_pdfs_endpoint():
 
             p_voetuor.start()
             p_scdp.start()
-
             p_voetuor.join()
             p_scdp.join()
 
-            # 3. Coleta dos Resultados
             result_voetuor = queue_voetuor.get()
             result_scdp = queue_scdp.get()
 
             if result_voetuor["status"] == "FAILED" or result_scdp["status"] == "FAILED":
                 error_msg = f"Erro Voetuor: {result_voetuor.get('error', 'N/A')}. Erro SCDP: {result_scdp.get('error', 'N/A')}"
-                return jsonify({"status": "erro", "mensagem": f"Falha no processamento de um ou mais PDFs. {error_msg}"}), 500
+                return jsonify({"status": "erro", "mensagem": error_msg}), 500
 
-            # 4. Retorna o JSON final
             end_time = time.time()
             elapsed_time = end_time - start_time
-            
+
             return jsonify({
                 "status": "sucesso",
                 "dados": {
@@ -76,7 +68,8 @@ def processar_pdfs_endpoint():
 
     except Exception as e:
         traceback.print_exc()
-        return jsonify({"status": "erro", "mensagem": f"Erro interno do servidor: {str(e)}"}), 500
+        return jsonify({"status": "erro", "mensagem": f"Erro interno: {str(e)}"}), 500
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
